@@ -5,20 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GCP Pub/Sub Chat</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-        #chat-box { height: 400px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
-        .message { margin-bottom: 5px; }
-        .username { font-weight: bold; color: #007bff; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        #chat-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #chat-box {
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #e9ebee;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+            align-self: flex-start;
+            background-color: #fff;
+            color: #333;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+        .sent-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        .username {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .sent-message .username {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        #message-form {
+            display: flex;
+            gap: 10px;
+        }
+        #username {
+            width: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
-    <h1>Real-time Chat with GCP Pub/Sub</h1>
-    <div id="chat-box"></div>
-    <form id="message-form">
-        <input type="text" id="username" placeholder="Your Name" required>
-        <input type="text" id="message-input" placeholder="Type a message..." required>
-        <button type="submit">Send</button>
-    </form>
+    <div id="chat-container">
+        <h1>Real-time Chat with GCP Pub/Sub</h1>
+        <div id="chat-box"></div>
+        <form id="message-form">
+            <input type="text" id="username" placeholder="Your Name" required>
+            <input type="text" id="message-input" placeholder="Type a message..." required>
+            <button type="submit">Send</button>
+        </form>
+    </div>
 
     <script>
     const chatBox = document.getElementById('chat-box');
@@ -26,37 +114,53 @@
     const usernameInput = document.getElementById('username');
     const messageInput = document.getElementById('message-input');
 
-    // Function to add a message to the chat box
-    function addMessage(data) {
+    const savedUsername = localStorage.getItem('chatUsername');
+    if (savedUsername) {
+        usernameInput.value = savedUsername;
+    }
+
+    function addMessage(data, isSender = false) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('message');
+        if (isSender) {
+            messageElement.classList.add('sent-message');
+        }
         messageElement.innerHTML = `<span class="username">${data.username}:</span> ${data.message}`;
         chatBox.appendChild(messageElement);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // Set up Server-Sent Events (SSE) to receive new messages
     const eventSource = new EventSource('/stream');
     eventSource.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        addMessage(data);
+        const myUsername = usernameInput.value;
+        
+        // Only display messages that are not from the current user
+        if (data.username !== myUsername) {
+            addMessage(data);
+        }
     };
 
-    // Handle form submission
     messageForm.addEventListener('submit', async function(e) {
-        // THIS IS THE CRUCIAL LINE
         e.preventDefault();
 
         const username = usernameInput.value;
         const message = messageInput.value;
+
         if (username && message) {
+            localStorage.setItem('chatUsername', username);
+
+            const sentMessageData = { username: username, message: message };
+            // Display your message immediately
+            addMessage(sentMessageData, true);
+
             try {
                 await fetch('/publish', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, message })
+                    body: JSON.stringify(sentMessageData)
                 });
-                messageInput.value = ''; // Clear the input field
+                messageInput.value = '';
             } catch (error) {
                 console.error('Error publishing message:', error);
             }
