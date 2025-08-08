@@ -1,5 +1,5 @@
-# PUB-SUB Messaging App
-## 🔄 PUB-SUB Messaging System
+# Chronos chat
+## 🔄 Chronos chat Messaging System
 
 A lightweight and efficient **Publisher-Subscriber** messaging system built to demonstrate real-time communication using core concepts of distributed systems.
 
